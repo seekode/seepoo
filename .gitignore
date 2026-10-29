@@ -1,0 +1,4 @@
+node_modules/
+dist/
+src/client/.svelte-kit/
+old/

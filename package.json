@@ -1,0 +1,55 @@
+{
+  "name": "seepoo",
+  "version": "1.0.0",
+  "description": "Outil pédagogique CLI multi-langage de visualisation, manipulation et planification d'architecture Orientée Objet en temps réel",
+  "type": "module",
+  "bin": {
+    "seepoo": "./bin/cli.js"
+  },
+  "files": [
+    "bin/",
+    "src/shared/",
+    "src/server/",
+    "dist/client/"
+  ],
+  "scripts": {
+    "start": "npm run build:client && node ./bin/cli.js start --dir ./examples/tp-banque",
+    "dev": "node -e \"import('node:child_process').then(({spawn})=>{const o={stdio:'inherit',shell:true};spawn('npm run dev:server',o);spawn('npm run dev:client',o);})\"",
+    "dev:server": "node ./bin/cli.js start --dir ./examples/tp-banque --no-open",
+    "dev:client": "cd src/client && svelte-kit sync && vite",
+    "build:client": "cd src/client && svelte-kit sync && vite build",
+    "i18n:compile": "cd src/client && paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --strategy localStorage --strategy baseLocale",
+    "test:playground": "npm run build:client && node ./bin/cli.js start --dir ./examples/tp-banque",
+    "test:ast": "node --input-type=module -e \"import { analyzeProject } from './src/server/astParser.js'; console.dir(await analyzeProject('./examples/tp-banque'), { depth: null });\"",
+    "prepublishOnly": "npm run build:client"
+  },
+  "dependencies": {
+    "@babel/generator": "^7.25.0",
+    "@babel/parser": "^7.25.0",
+    "@babel/traverse": "^7.25.0",
+    "chalk": "^5.3.0",
+    "chokidar": "^3.6.0",
+    "commander": "^12.1.0",
+    "express": "^4.19.2",
+    "glob": "^11.0.0",
+    "open": "^10.1.0",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "@inlang/paraglide-js": "^2.29.3",
+    "@inlang/plugin-message-format": "^4.5.0",
+    "@lucide/svelte": "^1.16.0",
+    "@sveltejs/adapter-static": "^3.0.6",
+    "@sveltejs/kit": "^2.15.0",
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "socket.io-client": "^4.7.5",
+    "svelte": "^5.20.0",
+    "vite": "^5.3.4"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "bun": ">=1.1.0"
+  },
+  "private": false,
+  "license": "UNLICENSED"
+}

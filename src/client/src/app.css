@@ -1,0 +1,238 @@
+/* ============================================================================
+   DESIGN TOKENS & GESTION DU THÈME CLAIR / SOMBRE (Light / Dark)
+   Conforme aux standards Web modernes (color-scheme, light-dark(), :has())
+   ============================================================================ */
+
+:root {
+  /* Couleurs brutes Light / Dark */
+  --surface-app-light: #f8fafc;
+  --surface-app-dark: #020617;
+
+  --surface-header-light: rgba(255, 255, 255, 0.92);
+  --surface-header-dark: rgba(15, 23, 42, 0.88);
+
+  --surface-card-light: rgba(255, 255, 255, 0.97);
+  --surface-card-dark: rgba(15, 23, 42, 0.96);
+
+  --surface-elevated-light: #f1f5f9;
+  --surface-elevated-dark: #0f172a;
+
+  --surface-input-light: #ffffff;
+  --surface-input-dark: #0f172a;
+
+  --surface-code-light: #f1f5f9;
+  --surface-code-dark: rgba(15, 23, 42, 0.92);
+
+  --text-primary-light: #0f172a;
+  --text-primary-dark: #f8fafc;
+
+  --text-secondary-light: #334155;
+  --text-secondary-dark: #cbd5e1;
+
+  --text-muted-light: #64748b;
+  --text-muted-dark: #94a3b8;
+
+  --border-subtle-light: #e2e8f0;
+  --border-subtle-dark: #1e293b;
+
+  --border-strong-light: #cbd5e1;
+  --border-strong-dark: #334155;
+
+  --grid-dot-light: #cbd5e1;
+  --grid-dot-dark: #334155;
+
+  --accent-brand-light: #4f46e5;
+  --accent-brand-dark: #6366f1;
+
+  /* Fallbacks par défaut (Light) */
+  --surface-app: var(--surface-app-light);
+  --surface-header: var(--surface-header-light);
+  --surface-card: var(--surface-card-light);
+  --surface-elevated: var(--surface-elevated-light);
+  --surface-input: var(--surface-input-light);
+  --surface-code: var(--surface-code-light);
+  --text-primary: var(--text-primary-light);
+  --text-secondary: var(--text-secondary-light);
+  --text-muted: var(--text-muted-light);
+  --border-subtle: var(--border-subtle-light);
+  --border-strong: var(--border-strong-light);
+  --grid-dot: var(--grid-dot-light);
+  --accent-color: var(--accent-brand-light);
+
+  /* Fallback media query pour navigateurs sans light-dark() */
+  @media (prefers-color-scheme: dark) {
+    --surface-app: var(--surface-app-dark);
+    --surface-header: var(--surface-header-dark);
+    --surface-card: var(--surface-card-dark);
+    --surface-elevated: var(--surface-elevated-dark);
+    --surface-input: var(--surface-input-dark);
+    --surface-code: var(--surface-code-dark);
+    --text-primary: var(--text-primary-dark);
+    --text-secondary: var(--text-secondary-dark);
+    --text-muted: var(--text-muted-dark);
+    --border-subtle: var(--border-subtle-dark);
+    --border-strong: var(--border-strong-dark);
+    --grid-dot: var(--grid-dot-dark);
+    --accent-color: var(--accent-brand-dark);
+  }
+
+  /* Utilisation native de light-dark() indexée sur color-scheme */
+  @supports (color: light-dark(white, black)) {
+    --surface-app: light-dark(var(--surface-app-light), var(--surface-app-dark));
+    --surface-header: light-dark(var(--surface-header-light), var(--surface-header-dark));
+    --surface-card: light-dark(var(--surface-card-light), var(--surface-card-dark));
+    --surface-elevated: light-dark(var(--surface-elevated-light), var(--surface-elevated-dark));
+    --surface-input: light-dark(var(--surface-input-light), var(--surface-input-dark));
+    --surface-code: light-dark(var(--surface-code-light), var(--surface-code-dark));
+    --text-primary: light-dark(var(--text-primary-light), var(--text-primary-dark));
+    --text-secondary: light-dark(var(--text-secondary-light), var(--text-secondary-dark));
+    --text-muted: light-dark(var(--text-muted-light), var(--text-muted-dark));
+    --border-subtle: light-dark(var(--border-subtle-light), var(--border-subtle-dark));
+    --border-strong: light-dark(var(--border-strong-light), var(--border-strong-dark));
+    --grid-dot: light-dark(var(--grid-dot-light), var(--grid-dot-dark));
+    --accent-color: light-dark(var(--accent-brand-light), var(--accent-brand-dark));
+    --color-scrollbar-track: light-dark(#e2e8f0, #0f172a);
+    --color-scrollbar-thumb: light-dark(#94a3b8, #475569);
+    scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
+  }
+
+  /* MANDATORY: Adaptation automatique de l'UI native du navigateur */
+  color-scheme: light dark;
+  accent-color: var(--accent-color);
+
+  &:has(> head > meta[name="color-scheme"][content="dark"]) {
+    color-scheme: dark;
+  }
+  &:has(> head > meta[name="color-scheme"][content="light"]) {
+    color-scheme: light;
+  }
+}
+
+body {
+  background-color: var(--surface-app);
+  color: var(--text-primary);
+}
+
+/* Adaptation harmonieuse des classes utilitaires sombres lorsque le thème Clair est actif */
+:root[data-theme="light"] .bg-slate-950 {
+  background-color: #f1f5f9 !important;
+}
+:root[data-theme="light"] .bg-slate-950\/70,
+:root[data-theme="light"] .bg-slate-950\/80 {
+  background-color: rgba(241, 245, 249, 0.9) !important;
+}
+:root[data-theme="light"] .bg-slate-900,
+:root[data-theme="light"] .bg-slate-900\/80,
+:root[data-theme="light"] .bg-slate-900\/90,
+:root[data-theme="light"] .bg-slate-900\/95 {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+}
+:root[data-theme="light"] .bg-slate-800,
+:root[data-theme="light"] .bg-slate-800\/40,
+:root[data-theme="light"] .bg-slate-800\/60,
+:root[data-theme="light"] .bg-slate-800\/70,
+:root[data-theme="light"] .bg-slate-800\/80 {
+  background-color: #e2e8f0 !important;
+}
+:root[data-theme="light"] .from-indigo-950\/80,
+:root[data-theme="light"] .from-indigo-950\/90 {
+  --tw-gradient-from: #e0e7ff var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: #ffffff var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), #f8fafc, var(--tw-gradient-to) !important;
+}
+:root[data-theme="light"] .border-slate-800,
+:root[data-theme="light"] .border-slate-800\/80 {
+  border-color: #cbd5e1 !important;
+}
+:root[data-theme="light"] .border-slate-700,
+:root[data-theme="light"] .border-slate-700\/60 {
+  border-color: #94a3b8 !important;
+}
+:root[data-theme="light"] .text-white,
+:root[data-theme="light"] .text-slate-100,
+:root[data-theme="light"] .text-slate-200 {
+  color: #0f172a !important;
+}
+:root[data-theme="light"] .bg-indigo-600.text-white,
+:root[data-theme="light"] .bg-emerald-600.text-white {
+  color: #ffffff !important;
+}
+:root[data-theme="light"] .text-slate-300 {
+  color: #334155 !important;
+}
+:root[data-theme="light"] .text-slate-400,
+:root[data-theme="light"] .text-slate-500 {
+  color: #475569 !important;
+}
+:root[data-theme="light"] .text-indigo-300,
+:root[data-theme="light"] .text-indigo-400 {
+  color: #4338ca !important;
+}
+:root[data-theme="light"] .text-emerald-300,
+:root[data-theme="light"] .text-emerald-400 {
+  color: #047857 !important;
+}
+:root[data-theme="light"] .text-amber-200,
+:root[data-theme="light"] .text-amber-300,
+:root[data-theme="light"] .text-amber-400 {
+  color: #b45309 !important;
+}
+:root[data-theme="light"] .text-cyan-200,
+:root[data-theme="light"] .text-cyan-300 {
+  color: #0e7490 !important;
+}
+:root[data-theme="light"] .bg-cyan-950,
+:root[data-theme="light"] .bg-cyan-950\/80,
+:root[data-theme="light"] .bg-cyan-950\/90,
+:root[data-theme="light"] .bg-cyan-950\/40 {
+  background-color: #ecfeff !important;
+}
+:root[data-theme="light"] .text-orange-300 {
+  color: #c2410c !important;
+}
+:root[data-theme="light"] .bg-orange-950,
+:root[data-theme="light"] .bg-orange-950\/80 {
+  background-color: #fff7ed !important;
+}
+:root[data-theme="light"] .bg-indigo-950\/40 {
+  background-color: #eef2ff !important;
+}
+:root[data-theme="light"] .text-indigo-200 {
+  color: #3730a3 !important;
+}
+:root[data-theme="light"] .bg-emerald-950\/60 {
+  background-color: #ecfdf5 !important;
+}
+:root[data-theme="light"] .bg-rose-950\/60,
+:root[data-theme="light"] .bg-rose-950\/90 {
+  background-color: #fff1f2 !important;
+}
+:root[data-theme="light"] .text-rose-200,
+:root[data-theme="light"] .text-rose-300,
+:root[data-theme="light"] .text-rose-400 {
+  color: #be123c !important;
+}
+
+/* Scrollbar personnalisée moderne et discrète */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

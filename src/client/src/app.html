@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- MANDATORY: Declare support for both light and dark themes -->
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      try {
+        const stored = localStorage.getItem('color-scheme');
+        const meta = document.querySelector('meta[name="color-scheme"]');
+        if (meta) meta.content = stored ?? 'light dark';
+        const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const resolved = stored === 'light' || stored === 'dark' ? stored : sysDark ? 'dark' : 'light';
+        document.documentElement.dataset.theme = resolved;
+      } catch {}
+    </script>
+    <title>SeePOO — Visualiseur & Sandbox Orientée Objet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover" class="overflow-hidden select-none">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>
