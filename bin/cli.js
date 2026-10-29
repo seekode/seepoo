@@ -33,8 +33,8 @@ program
   });
 
 program
-  .command('start')
-  .description("Lance le serveur d'analyse AST, la sandbox VM et l'interface web locale")
+  .command('start', { isDefault: true })
+  .description("Lance le serveur d'analyse AST, la sandbox VM et l'interface web locale (commande par défaut)")
   .option('-p, --port <number>', 'Port du serveur local', '4242')
   .option('-d, --dir <path>', 'Dossier racine du code à observer', '.')
   .option('-l, --lang <id>', 'Driver de langage (auto, javascript, typescript, python, java)', 'auto')
