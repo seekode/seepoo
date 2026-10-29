@@ -21,6 +21,7 @@
     "i18n:compile": "cd src/client && paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --strategy localStorage --strategy baseLocale",
     "test:playground": "npm run build:client && node ./bin/cli.js start --dir ./examples/tp-banque",
     "test:ast": "node --input-type=module -e \"import { analyzeProject } from './src/server/astParser.js'; console.dir(await analyzeProject('./examples/tp-banque'), { depth: null });\"",
+    "prepack": "npm run build:client",
     "prepublishOnly": "npm run build:client"
   },
   "dependencies": {
