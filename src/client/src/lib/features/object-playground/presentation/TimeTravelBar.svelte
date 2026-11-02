@@ -1,5 +1,5 @@
 <script>
-  import { History, ChevronLeft, ChevronRight, Save, RotateCcw, Trash2 } from '@lucide/svelte';
+  import { History, ChevronLeft, ChevronRight, Save, RotateCcw, Trash2, X } from '@lucide/svelte';
   import { locale, m } from '$lib/features/i18n/application/i18nStore.js';
 
   let {
@@ -7,6 +7,7 @@
     currentStepIndex = 0,
     onSelectStep,
     onSaveStep,
+    onDeleteStep,
     onResetPlayground
   } = $props();
 
@@ -39,16 +40,32 @@
     <div class="flex items-center gap-1 px-1">
       {#each steps as st, idx (idx)}
         {@const isActive = idx === currentStepIndex}
-        <button
-          type="button"
-          onclick={() => onSelectStep?.(idx)}
-          title={st.label || m.obj_step_badge({ step: idx }, { locale: $locale })}
-          class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all {isActive
-            ? 'bg-indigo-600 text-white shadow'
-            : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200'}"
-        >
-          {m.obj_step_badge({ step: idx }, { locale: $locale })}
-        </button>
+        <div class="relative group flex items-center">
+          <button
+            type="button"
+            onclick={() => onSelectStep?.(idx)}
+            title={st.label || m.obj_step_badge({ step: idx }, { locale: $locale })}
+            class="px-2.5 py-1 {steps.length > 1 ? 'pr-5' : ''} rounded-lg text-xs font-mono font-bold transition-all {isActive
+              ? 'bg-indigo-600 text-white shadow'
+              : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200'}"
+          >
+            {m.obj_step_badge({ step: idx }, { locale: $locale })}
+          </button>
+
+          {#if steps.length > 1}
+            <button
+              type="button"
+              onclick={(e) => {
+                e.stopPropagation();
+                onDeleteStep?.(idx);
+              }}
+              title={m.tt_delete_step_title({ step: idx }, { locale: $locale })}
+              class="absolute right-1 w-3.5 h-3.5 rounded flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-500/80 hover:text-white text-slate-400 cursor-pointer"
+            >
+              <X class="w-2.5 h-2.5" />
+            </button>
+          {/if}
+        </div>
       {/each}
     </div>
 
@@ -94,6 +111,18 @@
     >
       <RotateCcw class="w-3.5 h-3.5" />
       <span>{m.tt_current_step_btn({ step: totalSteps - 1 }, { locale: $locale })}</span>
+    </button>
+  {/if}
+
+  {#if steps.length > 1}
+    <button
+      type="button"
+      onclick={() => onDeleteStep?.(currentStepIndex)}
+      title={m.tt_delete_current_step_title({ step: currentStepIndex }, { locale: $locale })}
+      class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 text-rose-300 border border-rose-500/30 text-xs font-semibold shadow-lg shadow-rose-950/40 transition-all cursor-pointer"
+    >
+      <Trash2 class="w-3.5 h-3.5" />
+      <span class="hidden sm:inline">{m.tt_delete_step_btn({}, { locale: $locale })}</span>
     </button>
   {/if}
 

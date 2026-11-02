@@ -118,6 +118,12 @@
   "obj_default_placeholder": "défaut: {val}",
   "obj_value_placeholder": "valeur",
   "obj_return_label": "Retour :",
+  "obj_view_emoji_btn": "Vue Emoji",
+  "obj_view_emoji_active": "Vue Emoji active",
+  "obj_view_emoji_title": "Basculer en vue Emoji simplifiée (masquer les détails)",
+  "obj_view_detailed_title": "Basculer en vue détaillée (afficher propriétés et méthodes)",
+  "sidebar_collapse": "Replier le menu des classes",
+  "sidebar_expand": "Déplier le menu des classes",
 
   "tt_title": "Time-Travel",
   "tt_prev_step": "Étape précédente",
@@ -126,5 +132,8 @@
   "tt_save_title": "Sauvegarder l'état actuel des objets et passer à la nouvelle étape",
   "tt_objects_count": "{count} objet(s)",
   "tt_current_step_btn": "Étape actuelle ({step})",
+  "tt_delete_step_btn": "Supprimer l'étape",
+  "tt_delete_step_title": "Supprimer l'étape {step}",
+  "tt_delete_current_step_title": "Supprimer l'étape active {step}",
   "tt_reset_title": "Vider tous les objets et réinitialiser à l'Étape 0"
 }

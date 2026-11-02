@@ -118,6 +118,12 @@
   "obj_default_placeholder": "default: {val}",
   "obj_value_placeholder": "value",
   "obj_return_label": "Return:",
+  "obj_view_emoji_btn": "Emoji View",
+  "obj_view_emoji_active": "Emoji View active",
+  "obj_view_emoji_title": "Switch to simplified Emoji view (hide details)",
+  "obj_view_detailed_title": "Switch to detailed view (show properties and methods)",
+  "sidebar_collapse": "Collapse classes menu",
+  "sidebar_expand": "Expand classes menu",
 
   "tt_title": "Time-Travel",
   "tt_prev_step": "Previous step",
@@ -126,5 +132,8 @@
   "tt_save_title": "Save current object state and advance to the next step",
   "tt_objects_count": "{count} object(s)",
   "tt_current_step_btn": "Current step ({step})",
+  "tt_delete_step_btn": "Delete step",
+  "tt_delete_step_title": "Delete step {step}",
+  "tt_delete_current_step_title": "Delete active step {step}",
   "tt_reset_title": "Clear all objects and reset back to Step 0"
 }
