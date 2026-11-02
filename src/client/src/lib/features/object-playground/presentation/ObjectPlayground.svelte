@@ -126,6 +126,7 @@
   let isEmojiView = $state(loadInitialEmojiView());
   let expandedObjectIds = $state(new Set());
   let wasDraggingObject = false;
+  let wasPanningCanvas = false;
 
   let dragState = $state(null);
   let panDrag = $state(null);
@@ -593,7 +594,8 @@
       startX: e.clientX,
       startY: e.clientY,
       originCamX: camera.x,
-      originCamY: camera.y
+      originCamY: camera.y,
+      hasMoved: false
     };
   }
 
@@ -618,6 +620,9 @@
     if (panDrag) {
       const dx = e.clientX - panDrag.startX;
       const dy = e.clientY - panDrag.startY;
+      if (Math.hypot(dx, dy) > 4) {
+        panDrag.hasMoved = true;
+      }
       camera = {
         ...camera,
         x: panDrag.originCamX + dx,
@@ -632,23 +637,41 @@
         wasDraggingObject = true;
         setTimeout(() => {
           wasDraggingObject = false;
-        }, 80);
+        }, 100);
       }
       dragState = null;
     }
-    if (panDrag) panDrag = null;
+    if (panDrag) {
+      if (panDrag.hasMoved) {
+        wasPanningCanvas = true;
+        setTimeout(() => {
+          wasPanningCanvas = false;
+        }, 100);
+      }
+      panDrag = null;
+    }
   }
 
   function handleToggleEmojiExpansion(e, objId) {
     if (wasDraggingObject) return;
     e.stopPropagation();
     if (expandedObjectIds.has(objId)) {
-      expandedObjectIds.delete(objId);
+      expandedObjectIds.clear();
     } else {
+      expandedObjectIds.clear();
       expandedObjectIds.add(objId);
     }
     expandedObjectIds = new Set(expandedObjectIds);
     tick().then(measureObjects);
+  }
+
+  function handleCanvasClick() {
+    if (wasPanningCanvas) return;
+    if (isEmojiView && expandedObjectIds.size > 0) {
+      expandedObjectIds.clear();
+      expandedObjectIds = new Set();
+      tick().then(measureObjects);
+    }
   }
 
   function isScrollableElement(target) {
@@ -1114,12 +1137,14 @@
   </aside>
 
   <!-- CANVAS INFINI DES OBJETS -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     bind:this={viewportEl}
     onpointerdown={handleCanvasPointerDown}
     onpointermove={handlePointerMove}
     onpointerup={handlePointerUp}
+    onclick={handleCanvasClick}
     ondragover={handleCanvasDragOver}
     ondragleave={handleCanvasDragLeave}
     ondrop={handleCanvasDrop}
@@ -1313,22 +1338,31 @@
               }
             }}
             title="{obj.label} ({obj.className}) — {m.obj_expand_from_emoji({}, { locale: $locale })}"
-            class="pointer-events-auto absolute top-0 left-0 flex items-center justify-center cursor-pointer select-none group {isBeingDragged
-              ? 'z-30 scale-125'
-              : 'z-20 hover:scale-125 active:scale-95'} transition-transform duration-150 animate-emoji-pop-in"
+            class="pointer-events-auto absolute top-0 left-0 select-none cursor-grab active:cursor-grabbing {isBeingDragged
+              ? 'z-30'
+              : 'z-20'}"
             style="width: 56px; height: 56px;"
           >
-            <span
-              class="text-5xl select-none filter drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)] group-hover:drop-shadow-[0_0_18px_rgba(99,102,241,0.85)] transition-all"
+            <div
+              class="w-full h-full flex items-center justify-center animate-emoji-pop-in transition-transform duration-150 {isBeingDragged
+                ? 'scale-125'
+                : 'hover:scale-125 active:scale-95'}"
             >
-              {emoji}
-            </span>
+              <span
+                class="text-5xl select-none filter drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)] hover:drop-shadow-[0_0_18px_rgba(99,102,241,0.85)] transition-all pointer-events-none"
+              >
+                {emoji}
+              </span>
+            </div>
           </div>
         {:else}
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             use:bindCardEl={obj.id}
             style:transform="translate3d({pos.x}px, {pos.y}px, 0)"
             onpointerdown={(e) => e.stopPropagation()}
+            onclick={(e) => e.stopPropagation()}
             class="pointer-events-auto absolute top-0 left-0 {isBeingDragged ? 'z-30' : 'z-10'}"
           >
             <div
