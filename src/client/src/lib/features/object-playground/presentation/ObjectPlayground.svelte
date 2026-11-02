@@ -12,7 +12,8 @@
     Link2,
     Sparkles,
     AlertCircle,
-    CheckCircle2
+    CheckCircle2,
+    X
   } from '@lucide/svelte';
   import { DEFAULT_CLASS_EMOJI } from '$lib/features/class-diagram/domain/constants.js';
   import {
@@ -116,13 +117,133 @@
   let currentObjects = $derived(currentStepData.objects || []);
   let isViewingPast = $derived(currentStepIndex < steps.length - 1);
 
-  let pointerEdges = $derived(computePointerEdges(currentObjects, cardSizes, propOffsets));
+  let effectiveCurrentObjects = $derived(
+    currentObjects.map((o) => ({ ...o, properties: getEffectiveProperties(o) }))
+  );
+  let pointerEdges = $derived(computePointerEdges(effectiveCurrentObjects, cardSizes, propOffsets));
 
   function getClassEmoji(clsName) {
     const draftEntry = (draft?.classes || []).find((c) => c.name === clsName);
     if (draftEntry?.emoji) return draftEntry.emoji;
     const clsEntry = classes.find((c) => c.name === clsName);
     return clsEntry?.emoji || DEFAULT_CLASS_EMOJI;
+  }
+
+  function getEffectiveProperties(obj) {
+    if (!obj) return [];
+    const clsMeta = classes.find((c) => c.name === obj.className);
+    const existing = obj.properties || [];
+    if (!clsMeta) return existing;
+
+    const existingNames = new Set(existing.map((p) => p.name));
+    const missing = [];
+
+    for (const p of clsMeta.properties || []) {
+      const rawName = p.name.startsWith('#') ? p.name.slice(1) : p.name;
+      if (!existingNames.has(p.name) && !existingNames.has(rawName)) {
+        existingNames.add(p.name);
+        let defaultVal = null;
+        if (p.defaultValue !== undefined && p.defaultValue !== null) {
+          try {
+            defaultVal = JSON.parse(p.defaultValue);
+          } catch {
+            defaultVal = p.defaultValue;
+          }
+        } else if (p.valueType === 'Array') {
+          defaultVal = [];
+        } else if (p.valueType === 'number') {
+          defaultVal = 0;
+        } else if (p.valueType === 'boolean') {
+          defaultVal = false;
+        }
+
+        missing.push({
+          name: p.name,
+          isPrivate: Boolean(p.isPrivate),
+          value: defaultVal,
+          status: p.status
+        });
+      }
+    }
+
+    return [...existing, ...missing];
+  }
+
+  function isArrayProperty(prop, obj) {
+    const clsMeta = classes.find((c) => c.name === obj.className);
+    const propMeta = clsMeta?.properties?.find((p) => p.name === prop.name);
+    return (
+      propMeta?.valueType === 'Array' ||
+      Array.isArray(prop.value) ||
+      (typeof prop.value === 'string' &&
+        prop.value.trim().startsWith('[') &&
+        prop.value.trim().endsWith(']'))
+    );
+  }
+
+  function getArrayItems(val) {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+      try {
+        const parsed = JSON.parse(val);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        // ignore
+      }
+    }
+    if (val && typeof val === 'object' && val.__type === 'Pointer') {
+      return [val];
+    }
+    return [];
+  }
+
+  function handleAddArrayItem(objId, propNameVal, targetObj) {
+    const targetPointer = {
+      __type: 'Pointer',
+      targetId: targetObj.id,
+      targetLabel: targetObj.label,
+      targetClass: targetObj.className
+    };
+
+    updateCurrentStepObjects((prev) =>
+      prev.map((obj) => {
+        if (obj.id !== objId) return obj;
+        const currentProps = [...getEffectiveProperties(obj)];
+        const idx = currentProps.findIndex((p) => p.name === propNameVal);
+        if (idx >= 0) {
+          const currentItems = getArrayItems(currentProps[idx].value);
+          currentProps[idx] = {
+            ...currentProps[idx],
+            value: [...currentItems, targetPointer]
+          };
+        } else {
+          const clsMeta = classes.find((c) => c.name === obj.className);
+          const propMeta = clsMeta?.properties?.find((p) => p.name === propNameVal);
+          currentProps.push({
+            name: propNameVal,
+            isPrivate: Boolean(propMeta?.isPrivate),
+            status: propMeta?.status,
+            value: [targetPointer]
+          });
+        }
+        return { ...obj, properties: currentProps };
+      })
+    );
+  }
+
+  function handleRemoveArrayItem(objId, propNameVal, indexToRemove) {
+    updateCurrentStepObjects((prev) =>
+      prev.map((obj) => {
+        if (obj.id !== objId) return obj;
+        const currentProps = [...getEffectiveProperties(obj)].map((p) => {
+          if (p.name !== propNameVal) return p;
+          const currentItems = getArrayItems(p.value);
+          const nextItems = currentItems.filter((_, i) => i !== indexToRemove);
+          return { ...p, value: nextItems };
+        });
+        return { ...obj, properties: currentProps };
+      })
+    );
   }
 
   function bindCardEl(node, objId) {
@@ -175,7 +296,7 @@
         const cardRect = cardEl.getBoundingClientRect();
         const scale = cardRect.width / cardWidth || 1;
 
-        for (const prop of obj.properties || []) {
+        for (const prop of getEffectiveProperties(obj)) {
           const propKey = `${obj.id}::${prop.name}`;
           const propEl = propEls[propKey];
           if (propEl) {
@@ -319,8 +440,13 @@
           const createdNode = graph.nodesData.find((n) => n.id === createdId);
 
           if (createdNode) {
+            const effectiveProps = getEffectiveProperties({
+              className,
+              properties: createdNode.properties || []
+            });
             const newObj = {
               ...createdNode,
+              properties: effectiveProps,
               label: customLabel,
               position: worldPosition
             };
@@ -337,14 +463,30 @@
     const fallbackId = `obj_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     sessionInstanceIds.add(fallbackId);
 
-    const initialProps = (clsMeta.properties || []).map((p, idx) => ({
-      name: p.name,
-      isPrivate: Boolean(p.isPrivate),
-      value:
-        parsedArgs[idx] !== undefined
-          ? parsedArgs[idx]
-          : p.defaultValue ?? (p.valueType === 'number' ? 0 : p.valueType === 'Array' ? [] : null)
-    }));
+    const initialProps = (clsMeta.properties || []).map((p, idx) => {
+      let defaultVal = null;
+      if (parsedArgs[idx] !== undefined) {
+        defaultVal = parsedArgs[idx];
+      } else if (p.defaultValue !== undefined && p.defaultValue !== null) {
+        try {
+          defaultVal = JSON.parse(p.defaultValue);
+        } catch {
+          defaultVal = p.defaultValue;
+        }
+      } else if (p.valueType === 'Array') {
+        defaultVal = [];
+      } else if (p.valueType === 'number') {
+        defaultVal = 0;
+      } else if (p.valueType === 'boolean') {
+        defaultVal = false;
+      }
+      return {
+        name: p.name,
+        isPrivate: Boolean(p.isPrivate),
+        status: p.status,
+        value: defaultVal
+      };
+    });
 
     const newObj = {
       id: fallbackId,
@@ -569,11 +711,23 @@
     updateCurrentStepObjects((prev) =>
       prev.map((obj) => {
         if (obj.id !== objId) return obj;
+        const currentProps = [...getEffectiveProperties(obj)];
+        const idx = currentProps.findIndex((p) => p.name === propNameVal);
+        if (idx >= 0) {
+          currentProps[idx] = { ...currentProps[idx], value: newValue };
+        } else {
+          const clsMeta = classes.find((c) => c.name === obj.className);
+          const propMeta = clsMeta?.properties?.find((p) => p.name === propNameVal);
+          currentProps.push({
+            name: propNameVal,
+            isPrivate: Boolean(propMeta?.isPrivate),
+            status: propMeta?.status,
+            value: newValue
+          });
+        }
         return {
           ...obj,
-          properties: (obj.properties || []).map((p) =>
-            p.name === propNameVal ? { ...p, value: newValue } : p
-          )
+          properties: currentProps
         };
       })
     );
@@ -654,9 +808,14 @@
             prevObjs.map((existingObj) => {
               const updatedNode = graph.nodesData.find((n) => n.id === existingObj.id);
               if (!updatedNode) return existingObj;
+              const serverProps = updatedNode.properties || [];
+              const serverNames = new Set(serverProps.map((p) => p.name));
+              const localDraftProps = (existingObj.properties || []).filter(
+                (p) => !serverNames.has(p.name)
+              );
               return {
                 ...existingObj,
-                properties: updatedNode.properties || existingObj.properties
+                properties: [...serverProps, ...localDraftProps]
               };
             })
           );
@@ -958,7 +1117,7 @@
                 font-family="monospace"
                 font-weight="bold"
               >
-                {m.obj_pointer_badge({}, { locale: $locale })}
+                {edge.badge ? (edge.badge === 'ref' ? m.obj_pointer_badge({}, { locale: $locale }) : edge.badge) : m.obj_pointer_badge({}, { locale: $locale })}
               </text>
             </g>
           </g>
@@ -973,6 +1132,7 @@
         {@const prevObj = previousStepData?.objects?.find((p) => p.id === obj.id)}
         {@const otherObjects = currentObjects.filter((o) => o.id !== obj.id)}
         {@const feedback = feedbackByObj[obj.id]}
+        {@const effectiveProps = getEffectiveProperties(obj)}
 
         <div
           use:bindCardEl={obj.id}
@@ -1032,121 +1192,268 @@
               class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between gap-4"
             >
               <span>
-                {m.properties_count({ count: (obj.properties || []).length }, { locale: $locale })}
+                {m.properties_count({ count: effectiveProps.length }, { locale: $locale })}
               </span>
               <span>{m.obj_current_value({}, { locale: $locale })}</span>
             </div>
 
-            {#if (obj.properties || []).length === 0}
+            {#if effectiveProps.length === 0}
               <p class="text-xs text-slate-500 italic">
                 {m.properties_empty({}, { locale: $locale })}
               </p>
             {:else}
-              <div class="space-y-1.5">
-                {#each obj.properties || [] as prop (prop.name)}
+              <div class="space-y-2">
+                {#each effectiveProps as prop (prop.name)}
                   {@const propKey = `${obj.id}::${prop.name}`}
                   {@const val = prop.value}
                   {@const isPointer = val && typeof val === 'object' && val.__type === 'Pointer'}
                   {@const prevProp = prevObj?.properties?.find((p) => p.name === prop.name)}
                   {@const hasChangedSincePrevStep =
                     prevProp !== undefined && JSON.stringify(prevProp.value) !== JSON.stringify(val)}
+                  {@const clsMeta = classes.find((c) => c.name === obj.className)}
+                  {@const propMeta = clsMeta?.properties?.find((p) => p.name === prop.name)}
+                  {@const isDraft = prop.status === 'draft-only' || propMeta?.status === 'draft-only'}
+                  {@const isArray = isArrayProperty(prop, obj)}
 
-                  <div
-                    use:bindPropEl={propKey}
-                    class="flex items-center justify-between gap-4 px-2.5 py-1.5 rounded-xl border text-xs font-mono {prop.isPrivate
-                      ? 'bg-slate-800/60 border-slate-700/60 text-slate-300'
-                      : 'bg-slate-950/80 border-slate-800 text-slate-100'} {hasChangedSincePrevStep
-                      ? 'ring-1 ring-amber-400 bg-amber-500/10'
-                      : ''}"
-                  >
-                    <div class="flex items-center gap-1.5 whitespace-nowrap">
-                      {#if prop.isPrivate}
-                        <Lock
-                          class="w-3.5 h-3.5 text-amber-400 shrink-0"
-                          title={m.obj_private_locked_title({}, { locale: $locale })}
-                        />
-                      {:else}
-                        <Unlock class="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      {/if}
-                      <span>{prop.name}</span>
-                      {#if hasChangedSincePrevStep}
-                        <Sparkles
-                          class="w-3 h-3 text-amber-400 shrink-0"
-                          title={m.obj_changed_since_prev({}, { locale: $locale })}
-                        />
-                      {/if}
-                    </div>
+                  {#if isArray}
+                    {@const arrayItems = getArrayItems(val)}
+                    <!-- Propriété de type Tableau (ex: allCompte) permettant de lier plusieurs objets -->
+                    <div
+                      use:bindPropEl={propKey}
+                      class="flex flex-col gap-1.5 px-2.5 py-2 rounded-xl border text-xs font-mono {prop.isPrivate
+                        ? 'bg-slate-800/60 border-slate-700/60 text-slate-300'
+                        : isDraft
+                        ? 'bg-amber-500/10 border-dashed border-amber-500/60 text-amber-200'
+                        : 'bg-slate-950/80 border-slate-800 text-slate-100'} {hasChangedSincePrevStep
+                        ? 'ring-1 ring-amber-400 bg-amber-500/10'
+                        : ''}"
+                    >
+                      <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <div class="flex items-center gap-1.5 whitespace-nowrap">
+                          {#if prop.isPrivate}
+                            <Lock
+                              class="w-3.5 h-3.5 text-amber-400 shrink-0"
+                              title={m.obj_private_locked_title({}, { locale: $locale })}
+                            />
+                          {:else}
+                            <Unlock class="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          {/if}
+                          <span class="font-semibold">{prop.name}</span>
+                          <span
+                            class="text-[10px] text-cyan-300 bg-cyan-950/80 border border-cyan-500/40 px-1.5 py-0.5 rounded font-sans"
+                          >
+                            Array{#if propMeta?.arrayItemType}&lt;{propMeta.arrayItemType}&gt;{/if}
+                          </span>
+                          {#if isDraft}
+                            <span
+                              class="text-[9px] font-sans font-semibold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded"
+                            >
+                              {m.badge_draft({}, { locale: $locale })}
+                            </span>
+                          {/if}
+                          {#if hasChangedSincePrevStep}
+                            <Sparkles
+                              class="w-3 h-3 text-amber-400 shrink-0"
+                              title={m.obj_changed_since_prev({}, { locale: $locale })}
+                            />
+                          {/if}
+                        </div>
 
-                    <div class="flex items-center gap-1.5 shrink-0">
-                      {#if isPointer}
-                        <span
-                          class="flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-950/90 text-cyan-300 border border-cyan-500/40 text-[11px] font-semibold whitespace-nowrap"
-                        >
-                          <Link2 class="w-3 h-3 text-cyan-400" />
-                          <span>{val.targetLabel}</span>
-                        </span>
-                      {:else if prop.isPrivate}
-                        <span
-                          title={m.obj_private_locked_title({}, { locale: $locale })}
-                          class="px-2 py-0.5 rounded bg-slate-900 text-amber-200 border border-slate-700 text-[11px] whitespace-nowrap"
-                        >
-                          {JSON.stringify(val)}
-                        </span>
-                      {:else}
-                        <input
-                          type="text"
-                          value={typeof val === 'string'
-                            ? val
-                            : val === null || val === undefined
-                            ? ''
-                            : JSON.stringify(val)}
-                          placeholder="null"
-                          oninput={(e) => {
-                            const raw = e.currentTarget.value;
-                            let parsed = raw;
-                            if (raw === 'true') parsed = true;
-                            else if (raw === 'false') parsed = false;
-                            else if (raw !== '' && !Number.isNaN(Number(raw))) {
-                              parsed = Number(raw);
-                            }
-                            handleMutateProperty(obj.id, prop.name, parsed);
-                          }}
-                          class="w-28 px-2 py-0.5 text-[11px] font-mono bg-slate-900 text-emerald-300 border border-slate-700 rounded focus:border-emerald-400 focus:outline-none"
-                        />
-                      {/if}
+                        {#if !prop.isPrivate && otherObjects.length > 0}
+                          <select
+                            value=""
+                            onchange={(e) => {
+                              const targetId = e.currentTarget.value;
+                              if (!targetId) return;
+                              const targetObj = otherObjects.find((o) => o.id === targetId);
+                              if (targetObj) {
+                                handleAddArrayItem(obj.id, prop.name, targetObj);
+                              }
+                              e.currentTarget.value = '';
+                            }}
+                            title={m.obj_add_to_array({}, { locale: $locale })}
+                            class="px-2 py-0.5 text-[10px] bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded cursor-pointer"
+                          >
+                            <option value="">{m.obj_add_to_array({}, { locale: $locale })}</option>
+                            {#each otherObjects as o (o.id)}
+                              <option value={o.id}>
+                                {getClassEmoji(o.className)} {o.label} ({o.className})
+                              </option>
+                            {/each}
+                          </select>
+                        {/if}
+                      </div>
 
-                      {#if !prop.isPrivate && otherObjects.length > 0}
-                        <select
-                          value={isPointer ? val.targetId : ''}
-                          onchange={(e) => {
-                            const targetId = e.currentTarget.value;
-                            if (!targetId) {
-                              handleMutateProperty(obj.id, prop.name, null);
-                              return;
-                            }
-                            const targetObj = otherObjects.find((o) => o.id === targetId);
-                            if (targetObj) {
-                              handleMutateProperty(obj.id, prop.name, {
-                                __type: 'Pointer',
-                                targetId: targetObj.id,
-                                targetLabel: targetObj.label,
-                                targetClass: targetObj.className
-                              });
-                            }
-                          }}
-                          title={m.obj_link_prop_title({}, { locale: $locale })}
-                          class="w-6 px-1 py-0.5 text-[10px] bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded cursor-pointer"
-                        >
-                          <option value="">{m.obj_link_to_object({}, { locale: $locale })}</option>
-                          {#each otherObjects as o (o.id)}
-                            <option value={o.id}>
-                              {getClassEmoji(o.className)} {o.label} ({o.className})
-                            </option>
+                      <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        {#if arrayItems.length === 0}
+                          <span class="text-[10px] text-slate-500 italic font-sans">[ ] (vide)</span>
+                        {:else}
+                          {#each arrayItems as item, itemIdx (itemIdx)}
+                            {@const isItemPointer =
+                              item && typeof item === 'object' && item.__type === 'Pointer'}
+                            {#if isItemPointer}
+                              <span
+                                class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-950/90 text-cyan-300 border border-cyan-500/40 text-[10px] font-semibold whitespace-nowrap shadow-sm"
+                              >
+                                <span class="text-cyan-400 font-mono text-[9px] opacity-75">
+                                  [{itemIdx}]
+                                </span>
+                                <Link2 class="w-3 h-3 text-cyan-400 shrink-0" />
+                                <span>{getClassEmoji(item.targetClass)}</span>
+                                <span>{item.targetLabel}</span>
+                                {#if !prop.isPrivate}
+                                  <button
+                                    type="button"
+                                    onclick={() =>
+                                      handleRemoveArrayItem(obj.id, prop.name, itemIdx)}
+                                    title={m.obj_remove_from_array({}, { locale: $locale })}
+                                    class="hover:text-rose-400 hover:bg-rose-500/20 rounded p-0.5 ml-0.5 cursor-pointer text-slate-400 transition-colors"
+                                  >
+                                    <X class="w-3 h-3" />
+                                  </button>
+                                {/if}
+                              </span>
+                            {:else}
+                              <span
+                                class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 text-[10px] font-mono whitespace-nowrap"
+                              >
+                                <span class="text-slate-500 text-[9px]">[{itemIdx}]</span>
+                                <span>{typeof item === 'object' ? JSON.stringify(item) : item}</span>
+                                {#if !prop.isPrivate}
+                                  <button
+                                    type="button"
+                                    onclick={() =>
+                                      handleRemoveArrayItem(obj.id, prop.name, itemIdx)}
+                                    title={m.obj_remove_from_array({}, { locale: $locale })}
+                                    class="hover:text-rose-400 hover:bg-rose-500/20 rounded p-0.5 ml-0.5 cursor-pointer text-slate-400 transition-colors"
+                                  >
+                                    <X class="w-3 h-3" />
+                                  </button>
+                                {/if}
+                              </span>
+                            {/if}
                           {/each}
-                        </select>
-                      {/if}
+                        {/if}
+                      </div>
                     </div>
-                  </div>
+                  {:else}
+                    <!-- Propriété standard (simple valeur ou pointeur unique) -->
+                    <div
+                      use:bindPropEl={propKey}
+                      class="flex items-center justify-between gap-4 px-2.5 py-1.5 rounded-xl border text-xs font-mono {prop.isPrivate
+                        ? 'bg-slate-800/60 border-slate-700/60 text-slate-300'
+                        : isDraft
+                        ? 'bg-amber-500/10 border-dashed border-amber-500/60 text-amber-200'
+                        : 'bg-slate-950/80 border-slate-800 text-slate-100'} {hasChangedSincePrevStep
+                        ? 'ring-1 ring-amber-400 bg-amber-500/10'
+                        : ''}"
+                    >
+                      <div class="flex items-center gap-1.5 whitespace-nowrap">
+                        {#if prop.isPrivate}
+                          <Lock
+                            class="w-3.5 h-3.5 text-amber-400 shrink-0"
+                            title={m.obj_private_locked_title({}, { locale: $locale })}
+                          />
+                        {:else}
+                          <Unlock class="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        {/if}
+                        <span>{prop.name}</span>
+                        {#if isDraft}
+                          <span
+                            class="text-[9px] font-sans font-semibold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded"
+                          >
+                            {m.badge_draft({}, { locale: $locale })}
+                          </span>
+                        {/if}
+                        {#if hasChangedSincePrevStep}
+                          <Sparkles
+                            class="w-3 h-3 text-amber-400 shrink-0"
+                            title={m.obj_changed_since_prev({}, { locale: $locale })}
+                          />
+                        {/if}
+                      </div>
+
+                      <div class="flex items-center gap-1.5 shrink-0">
+                        {#if isPointer}
+                          <span
+                            class="flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-950/90 text-cyan-300 border border-cyan-500/40 text-[11px] font-semibold whitespace-nowrap"
+                          >
+                            <Link2 class="w-3 h-3 text-cyan-400" />
+                            <span>{val.targetLabel}</span>
+                            {#if !prop.isPrivate}
+                              <button
+                                type="button"
+                                onclick={() => handleMutateProperty(obj.id, prop.name, null)}
+                                title={m.obj_unlink({}, { locale: $locale })}
+                                class="hover:text-rose-400 hover:bg-rose-500/20 rounded p-0.5 ml-0.5 cursor-pointer text-slate-400 transition-colors"
+                              >
+                                <X class="w-3 h-3" />
+                              </button>
+                            {/if}
+                          </span>
+                        {:else if prop.isPrivate}
+                          <span
+                            title={m.obj_private_locked_title({}, { locale: $locale })}
+                            class="px-2 py-0.5 rounded bg-slate-900 text-amber-200 border border-slate-700 text-[11px] whitespace-nowrap"
+                          >
+                            {JSON.stringify(val)}
+                          </span>
+                        {:else}
+                          <input
+                            type="text"
+                            value={typeof val === 'string'
+                              ? val
+                              : val === null || val === undefined
+                              ? ''
+                              : JSON.stringify(val)}
+                            placeholder="null"
+                            oninput={(e) => {
+                              const raw = e.currentTarget.value;
+                              let parsed = raw;
+                              if (raw === 'true') parsed = true;
+                              else if (raw === 'false') parsed = false;
+                              else if (raw !== '' && !Number.isNaN(Number(raw))) {
+                                parsed = Number(raw);
+                              }
+                              handleMutateProperty(obj.id, prop.name, parsed);
+                            }}
+                            class="w-28 px-2 py-0.5 text-[11px] font-mono bg-slate-900 text-emerald-300 border border-slate-700 rounded focus:border-emerald-400 focus:outline-none"
+                          />
+                        {/if}
+
+                        {#if !prop.isPrivate && otherObjects.length > 0}
+                          <select
+                            value={isPointer ? val.targetId : ''}
+                            onchange={(e) => {
+                              const targetId = e.currentTarget.value;
+                              if (!targetId) {
+                                handleMutateProperty(obj.id, prop.name, null);
+                                return;
+                              }
+                              const targetObj = otherObjects.find((o) => o.id === targetId);
+                              if (targetObj) {
+                                handleMutateProperty(obj.id, prop.name, {
+                                  __type: 'Pointer',
+                                  targetId: targetObj.id,
+                                  targetLabel: targetObj.label,
+                                  targetClass: targetObj.className
+                                });
+                              }
+                            }}
+                            title={m.obj_link_prop_title({}, { locale: $locale })}
+                            class="w-6 px-1 py-0.5 text-[10px] bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded cursor-pointer"
+                          >
+                            <option value="">{m.obj_link_to_object({}, { locale: $locale })}</option>
+                            {#each otherObjects as o (o.id)}
+                              <option value={o.id}>
+                                {getClassEmoji(o.className)} {o.label} ({o.className})
+                              </option>
+                            {/each}
+                          </select>
+                        {/if}
+                      </div>
+                    </div>
+                  {/if}
                 {/each}
               </div>
             {/if}
@@ -1283,7 +1590,7 @@
                   </div>
                   {#if feedback.returnValue !== undefined}
                     <div class="text-[11px] text-slate-300">
-                      {m.obj_return_label({}, { locale: $locale })}{' '}
+                      {m.obj_return_label({}, { locale: $locale })}
                       <span class="text-emerald-300">{JSON.stringify(feedback.returnValue)}</span>
                     </div>
                   {/if}
@@ -1291,7 +1598,7 @@
                     <div
                       class="text-[10px] text-slate-400 border-t border-emerald-800/60 pt-1 mt-1 space-y-0.5"
                     >
-                      {#each feedback.logs as logLine}
+                      {#each feedback.logs as logLine, logIdx (logIdx)}
                         <div>&gt; {logLine}</div>
                       {/each}
                     </div>

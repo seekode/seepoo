@@ -134,6 +134,7 @@ export class SandboxRuntime {
       this.context
     );
 
+    this.allClasses = astClasses;
     this.astClasses = astClasses.filter((c) => c.status !== 'draft-only');
 
     const allClassUnits = [];
@@ -220,10 +221,17 @@ export class SandboxRuntime {
     }
     if (typeof arg === 'string') {
       try {
-        return JSON.parse(arg);
+        const parsed = JSON.parse(arg);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item) => this.resolveArgument(item));
+        }
+        return parsed;
       } catch {
         return arg;
       }
+    }
+    if (Array.isArray(arg)) {
+      return arg.map((item) => this.resolveArgument(item));
     }
     return arg;
   }
@@ -330,7 +338,7 @@ export class SandboxRuntime {
     const edgesData = [];
 
     for (const [id, entry] of this.instances.entries()) {
-      const clsMeta = this.astClasses.find((c) => c.name === entry.className);
+      const clsMeta = (this.allClasses || this.astClasses).find((c) => c.name === entry.className);
       const properties = [];
       const seenNames = new Set();
 
@@ -357,6 +365,7 @@ export class SandboxRuntime {
         for (const [privKey, privVal] of Object.entries(privState)) {
           if (seenNames.has(privKey)) continue;
           const serialized = serializeValue(privVal, this.instanceToId, this.instances);
+          seenNames.add(privKey);
           properties.push({
             name: privKey,
             isPrivate: true,
@@ -364,6 +373,35 @@ export class SandboxRuntime {
           });
           extractEdgesFromProperty(id, privKey, serialized, edgesData);
         }
+      }
+
+      // 3. Propriétés manquantes ou brouillon déclarées dans clsMeta (ex: statut 'draft-only')
+      for (const prop of clsMeta?.properties || []) {
+        const rawName = prop.name.startsWith('#') ? prop.name.slice(1) : prop.name;
+        if (seenNames.has(prop.name) || seenNames.has(rawName)) continue;
+        seenNames.add(prop.name);
+
+        let initialVal = null;
+        if (prop.defaultValue !== undefined && prop.defaultValue !== null) {
+          try {
+            initialVal = JSON.parse(prop.defaultValue);
+          } catch {
+            initialVal = prop.defaultValue;
+          }
+        } else if (prop.valueType === 'Array') {
+          initialVal = [];
+        } else if (prop.valueType === 'number') {
+          initialVal = 0;
+        } else if (prop.valueType === 'boolean') {
+          initialVal = false;
+        }
+
+        properties.push({
+          name: prop.name,
+          isPrivate: Boolean(prop.isPrivate),
+          value: initialVal,
+          status: prop.status
+        });
       }
 
       nodesData.push({

@@ -60,7 +60,7 @@ export function computePointerEdges(currentObjects, cardSizes, propOffsets) {
         });
       }
 
-      targets.forEach(({ targetId, badge }) => {
+      targets.forEach(({ targetId, badge }, tIdx) => {
         if (targetId === srcObj.id) return;
         const tgtObj = objMap.get(targetId);
         const tgtPos = tgtObj.position || { x: 400, y: 100 };
@@ -83,8 +83,9 @@ export function computePointerEdges(currentObjects, cardSizes, propOffsets) {
             };
 
         const endPt = getRectBorderPoint(startPt, tgtRect, 9);
+        const curveOffset = targets.length > 1 ? (tIdx - (targets.length - 1) / 2) * 16 : 0;
         const midX = (startPt.x + endPt.x) / 2;
-        const midY = (startPt.y + endPt.y) / 2 - 18;
+        const midY = (startPt.y + endPt.y) / 2 - 18 + curveOffset;
 
         const ctrlPt = {
           x: 2 * midX - 0.5 * (startPt.x + endPt.x),

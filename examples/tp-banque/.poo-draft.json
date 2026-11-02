@@ -1,11 +1,11 @@
 {
   "version": "1.0",
-  "updatedAt": "2026-10-29T23:14:10.616Z",
+  "updatedAt": "2026-11-02T00:16:32.053Z",
   "positions": {
     "__notes__": [],
     "__camera__": {
-      "x": 728,
-      "y": 678,
+      "x": 1340,
+      "y": 668,
       "zoom": 1
     },
     "__objectPlayground__": {
@@ -14,21 +14,273 @@
           "stepNumber": 0,
           "label": "Étape 0",
           "savedAt": null,
-          "objects": []
+          "objects": [
+            {
+              "id": "obj_1793577826732_cmzt",
+              "label": "compteBancaire#1",
+              "className": "CompteBancaire",
+              "language": "javascript",
+              "position": {
+                "x": 448,
+                "y": 337
+              },
+              "properties": [
+                {
+                  "name": "titulaire",
+                  "isPrivate": false,
+                  "value": {
+                    "__type": "Pointer",
+                    "targetId": "obj_1793577924198_mfdf",
+                    "targetLabel": "client#1",
+                    "targetClass": "Client"
+                  }
+                },
+                {
+                  "name": "devise",
+                  "isPrivate": false,
+                  "value": "EUR"
+                },
+                {
+                  "name": "#solde",
+                  "isPrivate": true,
+                  "value": 150
+                }
+              ],
+              "methods": [
+                {
+                  "name": "deposer",
+                  "kind": "method",
+                  "isPrivate": false,
+                  "isStatic": false,
+                  "isAsync": false,
+                  "params": [
+                    {
+                      "name": "montant",
+                      "defaultValue": "50",
+                      "valueType": "number",
+                      "arrayItemType": null
+                    }
+                  ],
+                  "jsdoc": {
+                    "raw": "Ajoute de l'argent sur le compte\n@param {number} montant - Montant positif à créditer",
+                    "summary": "Ajoute de l'argent sur le compte",
+                    "tags": [
+                      {
+                        "tag": "param",
+                        "content": "{number} montant - Montant positif à créditer"
+                      }
+                    ]
+                  },
+                  "bodyCode": "{\n    const valeur = Number(montant);\n    if (valeur <= 0) throw new Error(\"Le montant doit être positif\");\n    this.#solde += valeur;\n    console.log(`Dépôt de ${valeur}€ effectué sur le compte de ${this.titulaire}`);\n    return this.#solde;\n  }",
+                  "loc": {
+                    "line": 22,
+                    "column": 2,
+                    "index": 541
+                  },
+                  "status": "implemented"
+                },
+                {
+                  "name": "retirer",
+                  "kind": "method",
+                  "isPrivate": false,
+                  "isStatic": false,
+                  "isAsync": false,
+                  "params": [
+                    {
+                      "name": "montant",
+                      "defaultValue": "20",
+                      "valueType": "number",
+                      "arrayItemType": null
+                    }
+                  ],
+                  "jsdoc": {
+                    "raw": "Retire de l'argent si le solde (incluant les frais) est suffisant\n@param {number} montant - Montant à débiter",
+                    "summary": "Retire de l'argent si le solde (incluant les frais) est suffisant",
+                    "tags": [
+                      {
+                        "tag": "param",
+                        "content": "{number} montant - Montant à débiter"
+                      }
+                    ]
+                  },
+                  "bodyCode": "{\n    const valeur = Number(montant);\n    const frais = this.#calculerFrais(valeur);\n    if (valeur + frais > this.#solde) {\n      throw new Error(\"Solde insuffisant !\");\n    }\n    this.#solde -= (valeur + frais);\n    return this.#solde;\n  }",
+                  "loc": {
+                    "line": 34,
+                    "column": 2,
+                    "index": 945
+                  },
+                  "status": "implemented"
+                },
+                {
+                  "name": "transfererVers",
+                  "kind": "method",
+                  "isPrivate": false,
+                  "isStatic": false,
+                  "isAsync": false,
+                  "params": [
+                    {
+                      "name": "compteDestinataire",
+                      "defaultValue": null,
+                      "valueType": "CompteBancaire",
+                      "arrayItemType": null
+                    },
+                    {
+                      "name": "montant",
+                      "defaultValue": "30",
+                      "valueType": "number",
+                      "arrayItemType": null
+                    }
+                  ],
+                  "jsdoc": {
+                    "raw": "Transfère un montant vers une autre instance de CompteBancaire\n@param {CompteBancaire} compteDestinataire - Référence (@ref:id) du compte cible\n@param {number} montant - Somme à transférer",
+                    "summary": "Transfère un montant vers une autre instance de CompteBancaire",
+                    "tags": [
+                      {
+                        "tag": "param",
+                        "content": "{CompteBancaire} compteDestinataire - Référence (@ref:id) du compte cible"
+                      },
+                      {
+                        "tag": "param",
+                        "content": "{number} montant - Somme à transférer"
+                      }
+                    ]
+                  },
+                  "bodyCode": "{\n    this.retirer(montant);\n    compteDestinataire.deposer(montant);\n    this.dernierBeneficiaire = compteDestinataire;\n    return `Transfert de ${montant}€ vers ${compteDestinataire.titulaire} réussi`;\n  }",
+                  "loc": {
+                    "line": 49,
+                    "column": 2,
+                    "index": 1428
+                  },
+                  "status": "implemented"
+                },
+                {
+                  "name": "#calculerFrais",
+                  "kind": "method",
+                  "isPrivate": true,
+                  "isStatic": false,
+                  "isAsync": false,
+                  "params": [
+                    {
+                      "name": "montant",
+                      "defaultValue": null,
+                      "valueType": null,
+                      "arrayItemType": null
+                    }
+                  ],
+                  "jsdoc": {
+                    "raw": "Méthode privée calculant les frais bancaires internes",
+                    "summary": "Méthode privée calculant les frais bancaires internes",
+                    "tags": []
+                  },
+                  "bodyCode": "{\n    return montant > 500 ? 2 : 0;\n  }",
+                  "loc": {
+                    "line": 59,
+                    "column": 2,
+                    "index": 1759
+                  },
+                  "status": "implemented"
+                },
+                {
+                  "name": "cloturerCompte",
+                  "kind": "method",
+                  "isPrivate": false,
+                  "isStatic": false,
+                  "params": [
+                    {
+                      "name": "motif",
+                      "defaultValue": null
+                    }
+                  ],
+                  "jsdoc": {
+                    "summary": "Méthode planifiée dans le Draft : doit remettre le solde à zéro et désactiver le compte.",
+                    "tags": []
+                  },
+                  "bodyCode": "// Méthode planifiée (Draft)",
+                  "status": "draft-only"
+                }
+              ]
+            },
+            {
+              "id": "obj_1793577924198_mfdf",
+              "label": "client#1",
+              "className": "Client",
+              "language": "javascript",
+              "position": {
+                "x": 1254,
+                "y": 374
+              },
+              "properties": [
+                {
+                  "name": "nom",
+                  "isPrivate": false,
+                  "value": "Bob Martin"
+                },
+                {
+                  "name": "comptePrincipal",
+                  "isPrivate": false,
+                  "value": {
+                    "__type": "Pointer",
+                    "targetId": "obj_1793577826732_cmzt",
+                    "targetLabel": "compteBancaire#1",
+                    "targetClass": "CompteBancaire"
+                  }
+                },
+                {
+                  "name": "#codeSecret",
+                  "isPrivate": true,
+                  "value": "1234"
+                }
+              ],
+              "methods": [
+                {
+                  "name": "associerCompte",
+                  "kind": "method",
+                  "isPrivate": false,
+                  "isStatic": false,
+                  "isAsync": false,
+                  "params": [
+                    {
+                      "name": "compte",
+                      "defaultValue": null,
+                      "valueType": "CompteBancaire",
+                      "arrayItemType": null
+                    }
+                  ],
+                  "jsdoc": {
+                    "raw": "Associe une instance de CompteBancaire à ce client (crée un pointeur mémoire !)\n@param {CompteBancaire} compte - Utiliser @ref:id_du_compte",
+                    "summary": "Associe une instance de CompteBancaire à ce client (crée un pointeur mémoire !)",
+                    "tags": [
+                      {
+                        "tag": "param",
+                        "content": "{CompteBancaire} compte - Utiliser @ref:id_du_compte"
+                      }
+                    ]
+                  },
+                  "bodyCode": "{\n    this.comptePrincipal = compte;\n    return `Compte de ${compte.titulaire} associé à ${this.nom}`;\n  }",
+                  "loc": {
+                    "line": 21,
+                    "column": 2,
+                    "index": 599
+                  },
+                  "status": "implemented"
+                }
+              ]
+            }
+          ]
         }
       ],
       "currentStepIndex": 0
     },
     "CompteBancaire": {
-      "x": -22,
-      "y": -265
+      "x": 57,
+      "y": -273
     },
     "Client": {
-      "x": -546,
-      "y": -257
+      "x": -945,
+      "y": -295
     },
     "LivretEpargne": {
-      "x": 708,
+      "x": 709,
       "y": 58
     },
     "Hello": {
@@ -69,13 +321,6 @@
           "isPrivate": true,
           "valueType": "number",
           "defaultValue": "0.03"
-        },
-        {
-          "name": "test",
-          "isPrivate": false,
-          "valueType": "Array",
-          "arrayItemType": "CompteBancaire",
-          "defaultValue": null
         }
       ],
       "methods": [
