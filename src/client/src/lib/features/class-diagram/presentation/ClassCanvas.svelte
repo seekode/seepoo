@@ -320,6 +320,7 @@
     window.addEventListener('resize', onResize);
     window.addEventListener('keydown', onKeyDown);
     return () => {
+      stopCameraAnimation();
       if (viewportEl) {
         viewportEl.removeEventListener('wheel', onWheelListener);
       }
@@ -329,7 +330,7 @@
     };
   });
 
-  function toggleExpandedCard(clsName) {
+  async function toggleExpandedCard(clsName) {
     if (expandedClassName === clsName) {
       closeExpandedCard();
     } else {
@@ -340,7 +341,9 @@
       methodParams = '';
       methodJsdoc = '';
       expandedClassName = clsName;
-      tick().then(measureCardsAndProps);
+      await tick();
+      centerCameraOnClass(clsName);
+      measureCardsAndProps();
     }
   }
 
@@ -377,9 +380,83 @@
     await onSaveDraft(patch);
   }
 
+  let cameraAnimId = null;
+
+  function stopCameraAnimation() {
+    if (cameraAnimId) {
+      cancelAnimationFrame(cameraAnimId);
+      cameraAnimId = null;
+    }
+  }
+
+  function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  function animateCameraTo(targetX, targetY, targetZoom = camera.zoom, duration = 380) {
+    stopCameraAnimation();
+
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      camera = { x: Math.round(targetX), y: Math.round(targetY), zoom: targetZoom };
+      return;
+    }
+
+    const startX = camera.x;
+    const startY = camera.y;
+    const startZoom = camera.zoom;
+    const startTime = performance.now();
+
+    function step(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      const ease = easeInOutCubic(progress);
+
+      camera = {
+        x: Math.round(startX + (targetX - startX) * ease),
+        y: Math.round(startY + (targetY - startY) * ease),
+        zoom: Number((startZoom + (targetZoom - startZoom) * ease).toFixed(3))
+      };
+
+      if (progress < 1) {
+        cameraAnimId = requestAnimationFrame(step);
+      } else {
+        cameraAnimId = null;
+      }
+    }
+
+    cameraAnimId = requestAnimationFrame(step);
+  }
+
+  function centerCameraOnClass(clsName, duration = 380) {
+    if (!viewportEl) return;
+    const targetClass = classes.find((c) => c.name === clsName);
+    const pos = positions[clsName] || targetClass?.position || { x: 100, y: 100 };
+
+    const vpRect = viewportEl.getBoundingClientRect();
+    const vpWidth = vpRect.width || window.innerWidth;
+    const vpHeight = vpRect.height || window.innerHeight;
+
+    const cardEl = cardEls[clsName];
+    // Largeur de la carte une fois dépliée
+    const cardW = 560;
+    // Hauteur visible bornée entre 240px et 640px (max-height)
+    const cardH = cardEl ? Math.min(640, Math.max(240, cardEl.scrollHeight || 400)) : 400;
+
+    const cardCenterX = pos.x + cardW / 2;
+    const cardCenterY = pos.y + cardH / 2;
+
+    const targetX = Math.round(vpWidth / 2 - cardCenterX * camera.zoom);
+    const targetY = Math.round(vpHeight / 2 - cardCenterY * camera.zoom);
+
+    animateCameraTo(targetX, targetY, camera.zoom, duration);
+  }
+
   function handleCenterOnClasses() {
     if (classes.length === 0) {
-      camera = { x: 0, y: 0, zoom: 1 };
+      animateCameraTo(0, 0, 1);
       return;
     }
 
@@ -389,7 +466,8 @@
     let maxY = -Infinity;
 
     classes.forEach((cls, idx) => {
-      const pos = positions[cls.name] ||
+      const pos =
+        positions[cls.name] ||
         cls.position || {
           x: 100 + (idx % 3) * 380,
           y: 100 + Math.floor(idx / 3) * 320
@@ -410,11 +488,10 @@
     const vpHeight = vpRect?.height || window.innerHeight;
 
     const targetZoom = 1;
-    camera = {
-      x: Math.round(vpWidth / 2 - worldCenterX * targetZoom),
-      y: Math.round(vpHeight / 2 - worldCenterY * targetZoom),
-      zoom: targetZoom
-    };
+    const targetX = Math.round(vpWidth / 2 - worldCenterX * targetZoom);
+    const targetY = Math.round(vpHeight / 2 - worldCenterY * targetZoom);
+
+    animateCameraTo(targetX, targetY, targetZoom, 400);
   }
 
   async function persistNotes(nextNotes) {
@@ -603,6 +680,7 @@
   }
 
   function applyZoom(e) {
+    stopCameraAnimation();
     if (!viewportEl) return;
     const rect = viewportEl.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -649,11 +727,12 @@
 
   function handleCardPointerDown(e, clsName) {
     if (e.button !== 0) return;
+    e.stopPropagation();
+    stopCameraAnimation();
     // Ignorer le drag si l'utilisateur clique dans un champ interactif (input, select, button, textarea, form)
     if (e.target.closest('button, input, select, textarea, label')) {
       return;
     }
-    e.stopPropagation();
     contextMenu = null;
 
     const pos = positions[clsName] || { x: 100, y: 100 };
@@ -670,6 +749,7 @@
   function handleNotePointerDown(e, noteId) {
     if (e.button !== 0) return;
     e.stopPropagation();
+    stopCameraAnimation();
     contextMenu = null;
     closeEmojiPicker();
 
@@ -687,6 +767,7 @@
 
   function handleCanvasPointerDown(e) {
     if (e.button !== 0) return;
+    stopCameraAnimation();
     contextMenu = null;
     closeEmojiPicker();
     if (expandedClassName) {
@@ -1497,7 +1578,11 @@
             {#if isExpanded && isDraftOnly}
               <button
                 type="button"
-                onclick={() => handleDeleteDraftClass(cls.name)}
+                onpointerdown={(e) => e.stopPropagation()}
+                onclick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteDraftClass(cls.name);
+                }}
                 class="flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-[11px] font-semibold transition-colors cursor-pointer"
               >
                 <Trash2 class="w-3 h-3" />
@@ -1507,7 +1592,11 @@
 
             <button
               type="button"
-              onclick={() => toggleExpandedCard(cls.name)}
+              onpointerdown={(e) => e.stopPropagation()}
+              onclick={(e) => {
+                e.stopPropagation();
+                toggleExpandedCard(cls.name);
+              }}
               title={isExpanded
                 ? m.collapse_card_title({}, { locale: $locale })
                 : m.expand_card_title({}, { locale: $locale })}
@@ -1641,6 +1730,7 @@
 
                     <div
                       use:bindPropEl={propKey}
+                      onpointerdown={(e) => e.stopPropagation()}
                       class="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-mono {isPropDraft
                         ? 'border border-dashed border-amber-500/60 bg-amber-500/10 text-amber-200'
                         : p.isPrivate
@@ -1685,7 +1775,11 @@
                           </span>
                           <button
                             type="button"
-                            onclick={() => handleDeleteDraftProperty(cls.name, p.name)}
+                            onpointerdown={(e) => e.stopPropagation()}
+                            onclick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteDraftProperty(cls.name, p.name);
+                            }}
                             title={m.delete_draft_prop_title({}, { locale: $locale })}
                             class="p-1 rounded-lg hover:bg-rose-500/20 text-rose-400 transition-colors cursor-pointer"
                           >
@@ -1878,6 +1972,7 @@
                             </span>
                             <button
                               type="button"
+                              onpointerdown={(e) => e.stopPropagation()}
                               onclick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteDraftMethod(cls.name, mItem.name);
