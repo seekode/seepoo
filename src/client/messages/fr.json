@@ -124,6 +124,8 @@
   "obj_view_detailed_title": "Basculer en vue détaillée (afficher propriétés et méthodes)",
   "sidebar_collapse": "Replier le menu des classes",
   "sidebar_expand": "Déplier le menu des classes",
+  "obj_collapse_to_emoji": "Replier en emoji",
+  "obj_expand_from_emoji": "Cliquer pour afficher la carte détaillée",
 
   "tt_title": "Time-Travel",
   "tt_prev_step": "Étape précédente",

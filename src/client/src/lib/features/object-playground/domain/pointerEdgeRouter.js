@@ -32,13 +32,20 @@ export function extractExecDetailsFromResponse(res) {
 /**
  * Calcul des flèches de pointeurs mémoire entre objets (partant de la propriété ou du bord en vue emoji)
  */
-export function computePointerEdges(currentObjects, cardSizes, propOffsets, isEmojiView = false) {
+export function computePointerEdges(
+  currentObjects,
+  cardSizes,
+  propOffsets,
+  isEmojiView = false,
+  expandedObjectIds = new Set()
+) {
   const edges = [];
   const objMap = new Map(currentObjects.map((o) => [o.id, o]));
 
   for (const srcObj of currentObjects) {
+    const isSrcEmoji = isEmojiView && !expandedObjectIds.has(srcObj.id);
     const srcPos = srcObj.position || { x: 100, y: 100 };
-    const srcSize = cardSizes[srcObj.id] || (isEmojiView ? { width: 170, height: 76 } : { width: 340, height: 240 });
+    const srcSize = cardSizes[srcObj.id] || (isSrcEmoji ? { width: 56, height: 56 } : { width: 340, height: 240 });
     const srcRect = { x: srcPos.x, y: srcPos.y, width: srcSize.width, height: srcSize.height };
     const srcCenter = { x: srcPos.x + srcSize.width / 2, y: srcPos.y + srcSize.height / 2 };
 
@@ -64,13 +71,14 @@ export function computePointerEdges(currentObjects, cardSizes, propOffsets, isEm
       targets.forEach(({ targetId, badge }, tIdx) => {
         if (targetId === srcObj.id) return;
         const tgtObj = objMap.get(targetId);
+        const isTgtEmoji = isEmojiView && !expandedObjectIds.has(targetId);
         const tgtPos = tgtObj.position || { x: 400, y: 100 };
-        const tgtSize = cardSizes[targetId] || (isEmojiView ? { width: 170, height: 76 } : { width: 340, height: 240 });
+        const tgtSize = cardSizes[targetId] || (isTgtEmoji ? { width: 56, height: 56 } : { width: 340, height: 240 });
         const tgtRect = { x: tgtPos.x, y: tgtPos.y, width: tgtSize.width, height: tgtSize.height };
         const tgtCenter = { x: tgtRect.x + tgtRect.width / 2, y: tgtRect.y + tgtRect.height / 2 };
 
         let startPt;
-        if (isEmojiView) {
+        if (isSrcEmoji) {
           startPt = getRectBorderPoint(tgtCenter, srcRect, 0);
         } else {
           const propKey = `${srcObj.id}::${prop.name}`;
@@ -97,7 +105,7 @@ export function computePointerEdges(currentObjects, cardSizes, propOffsets, isEm
           y: 2 * midY - 0.5 * (startPt.y + endPt.y)
         };
 
-        const displayBadge = isEmojiView
+        const displayBadge = isSrcEmoji
           ? (badge === 'ref' ? prop.name : `${prop.name}${badge}`)
           : badge;
 

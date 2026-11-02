@@ -124,6 +124,8 @@
   "obj_view_detailed_title": "Switch to detailed view (show properties and methods)",
   "sidebar_collapse": "Collapse classes menu",
   "sidebar_expand": "Expand classes menu",
+  "obj_collapse_to_emoji": "Collapse to emoji",
+  "obj_expand_from_emoji": "Click to show detailed card",
 
   "tt_title": "Time-Travel",
   "tt_prev_step": "Previous step",
