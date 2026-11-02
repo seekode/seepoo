@@ -14,7 +14,28 @@
     selectLanguage
   } from '$lib/features/realtime/infrastructure/socketClient.js';
 
-  let activeTab = $state('classes'); // 'classes' | 'objects'
+  const ACTIVE_TAB_STORAGE_KEY = 'seepoo:active-tab:v1';
+
+  function loadInitialActiveTab() {
+    if (typeof window === 'undefined') return 'classes';
+    try {
+      const saved = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
+      if (saved === 'classes' || saved === 'objects') return saved;
+    } catch {
+      // Fallback
+    }
+    return 'classes';
+  }
+
+  let activeTab = $state(loadInitialActiveTab());
+
+  $effect(() => {
+    try {
+      localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab);
+    } catch {
+      // ignore
+    }
+  });
 </script>
 
 <div class="h-screen w-screen flex flex-col bg-slate-950 text-slate-100">

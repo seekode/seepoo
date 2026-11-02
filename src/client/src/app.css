@@ -236,3 +236,50 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* ============================================================================
+   ANIMATIONS SEATED POUR VUE EMOJI ET CARTES D'OBJETS
+   ============================================================================ */
+
+@keyframes seepooCardPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.2);
+    filter: blur(4px);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.02);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+.animate-card-pop-in {
+  animation: seepooCardPopIn 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: 28px 28px;
+}
+
+@keyframes seepooEmojiPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-emoji-pop-in {
+  animation: seepooEmojiPopIn 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: center center;
+}

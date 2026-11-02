@@ -2,6 +2,8 @@ import { getRectBorderPoint } from '$lib/shared/domain/geometry.js';
 
 export const OBJ_CAMERA_STORAGE_KEY = 'seepoo:objects-camera:v1';
 export const OBJ_STEPS_STORAGE_KEY = 'seepoo:object-steps:v1';
+export const OBJ_SIDEBAR_COLLAPSED_STORAGE_KEY = 'seepoo:objects-sidebar-collapsed:v1';
+export const OBJ_EMOJI_VIEW_STORAGE_KEY = 'seepoo:objects-emoji-view:v1';
 
 /**
  * Extrait le graphe `{ nodesData, edgesData }` quelle que soit l'imbrication renvoyée par le serveur

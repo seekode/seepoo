@@ -23,6 +23,8 @@
   import {
     OBJ_CAMERA_STORAGE_KEY,
     OBJ_STEPS_STORAGE_KEY,
+    OBJ_SIDEBAR_COLLAPSED_STORAGE_KEY,
+    OBJ_EMOJI_VIEW_STORAGE_KEY,
     extractGraphFromServerResponse,
     extractExecDetailsFromResponse,
     computePointerEdges
@@ -97,13 +99,31 @@
     };
   }
 
+  function loadInitialSidebarCollapsed() {
+    if (typeof window === 'undefined') return false;
+    try {
+      return localStorage.getItem(OBJ_SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  function loadInitialEmojiView() {
+    if (typeof window === 'undefined') return false;
+    try {
+      return localStorage.getItem(OBJ_EMOJI_VIEW_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  }
+
   const initialStepsState = loadInitialStepsState();
   let camera = $state(loadInitialCamera());
   let steps = $state(initialStepsState.steps);
   let currentStepIndex = $state(initialStepsState.currentStepIndex);
 
-  let isSidebarCollapsed = $state(false);
-  let isEmojiView = $state(false);
+  let isSidebarCollapsed = $state(loadInitialSidebarCollapsed());
+  let isEmojiView = $state(loadInitialEmojiView());
   let expandedObjectIds = $state(new Set());
   let wasDraggingObject = false;
 
@@ -330,6 +350,23 @@
         OBJ_CAMERA_STORAGE_KEY,
         JSON.stringify({ x: camera.x, y: camera.y, zoom: camera.zoom })
       );
+    } catch {
+      // ignore
+    }
+  });
+
+  // Persistance des préférences utilisateur (menu replié & vue emoji)
+  $effect(() => {
+    try {
+      localStorage.setItem(OBJ_SIDEBAR_COLLAPSED_STORAGE_KEY, String(isSidebarCollapsed));
+    } catch {
+      // ignore
+    }
+  });
+
+  $effect(() => {
+    try {
+      localStorage.setItem(OBJ_EMOJI_VIEW_STORAGE_KEY, String(isEmojiView));
     } catch {
       // ignore
     }
@@ -928,35 +965,134 @@
 <div class="h-full w-full flex overflow-hidden bg-slate-950 select-none">
   <!-- MENU LATÉRAL GAUCHE : CLASSES À GLISSER-DÉPOSER SUR LE PLAN -->
   <aside
-    class="border-r border-slate-800 bg-slate-900/95 flex flex-col shrink-0 z-20 transition-[width] duration-300 ease-in-out overflow-hidden {isSidebarCollapsed
-      ? 'w-16'
-      : 'w-76'}"
+    style:width={isSidebarCollapsed ? '64px' : '304px'}
+    style="transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1);"
+    class="border-r border-slate-800 bg-slate-900/95 shrink-0 z-20 overflow-hidden relative"
   >
-    {#if isSidebarCollapsed}
-      <div class="p-2.5 flex flex-col items-center gap-3 w-16 h-full shrink-0">
+    <!-- MODE REPLIÉ (FINE BANDE VERTICALE) -->
+    <div
+      style="width: 64px;"
+      class="absolute inset-y-0 left-0 p-2 flex flex-col items-center gap-3 transition-opacity duration-300 {isSidebarCollapsed
+        ? 'opacity-100 pointer-events-auto'
+        : 'opacity-0 pointer-events-none'}"
+    >
+      <button
+        type="button"
+        onclick={() => {
+          isSidebarCollapsed = false;
+          tick().then(measureObjects);
+        }}
+        title={m.sidebar_expand({}, { locale: $locale })}
+        class="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+      >
+        <ChevronRight class="w-4 h-4" />
+      </button>
+
+      <div class="w-8 border-t border-slate-800"></div>
+
+      <div class="flex-1 w-full flex flex-col items-center gap-2 overflow-y-auto custom-scrollbar py-1">
+        {#each classes as cls (cls.name)}
+          {@const emoji = getClassEmoji(cls.name)}
+          {@const isDraft = cls.status === 'draft-only'}
+
+          <button
+            type="button"
+            draggable="true"
+            ondragstart={(e) => handleSidebarDragStart(e, cls.name)}
+            onclick={() => {
+              const vpRect = viewportEl?.getBoundingClientRect();
+              const vpW = vpRect?.width || 800;
+              const vpH = vpRect?.height || 600;
+              const offset = (currentObjects.length % 5) * 35;
+              const worldX = Math.round((vpW / 2 - camera.x) / camera.zoom - 150 + offset);
+              const worldY = Math.round((vpH / 2 - camera.y) / camera.zoom - 110 + offset);
+              createObjectInstance(cls.name, { x: worldX, y: worldY });
+            }}
+            title="{cls.name} — {m.obj_add_btn_title({ className: cls.name }, { locale: $locale })}"
+            class="w-10 h-10 rounded-xl bg-slate-950 border flex items-center justify-center text-lg cursor-grab active:cursor-grabbing hover:scale-105 active:scale-95 transition-all {isDraft
+              ? 'border-dashed border-amber-500/60 hover:border-amber-400 hover:bg-amber-950/20'
+              : 'border-slate-800 hover:border-indigo-500 hover:bg-slate-800/80'}"
+          >
+            {emoji}
+          </button>
+        {/each}
+      </div>
+    </div>
+
+    <!-- MODE DÉPLIÉ (PANEL COMPLET) -->
+    <div
+      style="width: 304px;"
+      class="absolute inset-y-0 left-0 p-4 flex flex-col gap-4 transition-opacity duration-300 {isSidebarCollapsed
+        ? 'opacity-0 pointer-events-none'
+        : 'opacity-100 pointer-events-auto'}"
+    >
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <h2 class="text-xs font-bold uppercase tracking-wider text-indigo-400">
+            {m.obj_sidebar_title({}, { locale: $locale })}
+          </h2>
+          <p class="text-[11px] text-slate-400 mt-1">
+            {m.obj_sidebar_desc({}, { locale: $locale })}
+          </p>
+        </div>
         <button
           type="button"
           onclick={() => {
-            isSidebarCollapsed = false;
+            isSidebarCollapsed = true;
             tick().then(measureObjects);
           }}
-          title={m.sidebar_expand({}, { locale: $locale })}
-          class="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+          title={m.sidebar_collapse({}, { locale: $locale })}
+          class="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0 mt-0.5"
         >
-          <ChevronRight class="w-4 h-4" />
+          <ChevronLeft class="w-4 h-4" />
         </button>
+      </div>
 
-        <div class="w-8 border-t border-slate-800"></div>
+      <div class="space-y-2 overflow-y-auto flex-1 custom-scrollbar">
+        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1">
+          {m.obj_available_classes({ count: classes.length }, { locale: $locale })}
+        </div>
 
-        <div class="flex-1 w-full flex flex-col items-center gap-2 overflow-y-auto custom-scrollbar py-1">
-          {#each classes as cls (cls.name)}
-            {@const emoji = getClassEmoji(cls.name)}
-            {@const isDraft = cls.status === 'draft-only'}
+        {#each classes as cls (cls.name)}
+          {@const emoji = getClassEmoji(cls.name)}
+          {@const isDraft = cls.status === 'draft-only'}
+
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            draggable="true"
+            ondragstart={(e) => handleSidebarDragStart(e, cls.name)}
+            class="group p-3 rounded-xl bg-slate-950 border transition-all cursor-grab active:cursor-grabbing flex items-center justify-between {isDraft
+              ? 'border-dashed border-amber-500/50 hover:border-amber-400'
+              : 'border-slate-800 hover:border-indigo-500'}"
+          >
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span
+                class="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-base shrink-0"
+              >
+                {emoji}
+              </span>
+              <div class="min-w-0">
+                <div class="text-xs font-bold text-white truncate flex items-center gap-1.5">
+                  <span>{cls.name}</span>
+                  {#if isDraft}
+                    <span
+                      class="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300"
+                    >
+                      {m.badge_draft({}, { locale: $locale })}
+                    </span>
+                  {/if}
+                </div>
+                <div class="text-[10px] font-mono text-slate-400">
+                  {m.obj_card_summary(
+                    { propsCount: cls.properties.length, methodsCount: cls.methods.length },
+                    { locale: $locale }
+                  )}
+                </div>
+              </div>
+            </div>
 
             <button
               type="button"
-              draggable="true"
-              ondragstart={(e) => handleSidebarDragStart(e, cls.name)}
               onclick={() => {
                 const vpRect = viewportEl?.getBoundingClientRect();
                 const vpW = vpRect?.width || 800;
@@ -966,104 +1102,15 @@
                 const worldY = Math.round((vpH / 2 - camera.y) / camera.zoom - 110 + offset);
                 createObjectInstance(cls.name, { x: worldX, y: worldY });
               }}
-              title="{cls.name} — {m.obj_add_btn_title({ className: cls.name }, { locale: $locale })}"
-              class="w-10 h-10 rounded-xl bg-slate-950 border flex items-center justify-center text-lg cursor-grab active:cursor-grabbing hover:scale-105 active:scale-95 transition-all {isDraft
-                ? 'border-dashed border-amber-500/60 hover:border-amber-400 hover:bg-amber-950/20'
-                : 'border-slate-800 hover:border-indigo-500 hover:bg-slate-800/80'}"
+              title={m.obj_add_btn_title({ className: cls.name }, { locale: $locale })}
+              class="p-1.5 rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600 hover:text-white transition-colors shrink-0"
             >
-              {emoji}
+              <PlusCircle class="w-4 h-4" />
             </button>
-          {/each}
-        </div>
-      </div>
-    {:else}
-      <div class="p-4 flex flex-col gap-4 w-76 h-full shrink-0">
-        <div class="flex items-start justify-between gap-2">
-          <div>
-            <h2 class="text-xs font-bold uppercase tracking-wider text-indigo-400">
-              {m.obj_sidebar_title({}, { locale: $locale })}
-            </h2>
-            <p class="text-[11px] text-slate-400 mt-1">
-              {m.obj_sidebar_desc({}, { locale: $locale })}
-            </p>
           </div>
-          <button
-            type="button"
-            onclick={() => {
-              isSidebarCollapsed = true;
-              tick().then(measureObjects);
-            }}
-            title={m.sidebar_collapse({}, { locale: $locale })}
-            class="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0 mt-0.5"
-          >
-            <ChevronLeft class="w-4 h-4" />
-          </button>
-        </div>
-
-        <div class="space-y-2 overflow-y-auto flex-1 custom-scrollbar">
-          <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1">
-            {m.obj_available_classes({ count: classes.length }, { locale: $locale })}
-          </div>
-
-          {#each classes as cls (cls.name)}
-            {@const emoji = getClassEmoji(cls.name)}
-            {@const isDraft = cls.status === 'draft-only'}
-
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div
-              draggable="true"
-              ondragstart={(e) => handleSidebarDragStart(e, cls.name)}
-              class="group p-3 rounded-xl bg-slate-950 border transition-all cursor-grab active:cursor-grabbing flex items-center justify-between {isDraft
-                ? 'border-dashed border-amber-500/50 hover:border-amber-400'
-                : 'border-slate-800 hover:border-indigo-500'}"
-            >
-              <div class="flex items-center gap-2.5 min-w-0">
-                <span
-                  class="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-base shrink-0"
-                >
-                  {emoji}
-                </span>
-                <div class="min-w-0">
-                  <div class="text-xs font-bold text-white truncate flex items-center gap-1.5">
-                    <span>{cls.name}</span>
-                    {#if isDraft}
-                      <span
-                        class="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300"
-                      >
-                        {m.badge_draft({}, { locale: $locale })}
-                      </span>
-                    {/if}
-                  </div>
-                  <div class="text-[10px] font-mono text-slate-400">
-                    {m.obj_card_summary(
-                      { propsCount: cls.properties.length, methodsCount: cls.methods.length },
-                      { locale: $locale }
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onclick={() => {
-                  const vpRect = viewportEl?.getBoundingClientRect();
-                  const vpW = vpRect?.width || 800;
-                  const vpH = vpRect?.height || 600;
-                  const offset = (currentObjects.length % 5) * 35;
-                  const worldX = Math.round((vpW / 2 - camera.x) / camera.zoom - 150 + offset);
-                  const worldY = Math.round((vpH / 2 - camera.y) / camera.zoom - 110 + offset);
-                  createObjectInstance(cls.name, { x: worldX, y: worldY });
-                }}
-                title={m.obj_add_btn_title({ className: cls.name }, { locale: $locale })}
-                class="p-1.5 rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600 hover:text-white transition-colors shrink-0"
-              >
-                <PlusCircle class="w-4 h-4" />
-              </button>
-            </div>
-          {/each}
-        </div>
+        {/each}
       </div>
-    {/if}
+    </div>
   </aside>
 
   <!-- CANVAS INFINI DES OBJETS -->
@@ -1266,32 +1313,30 @@
               }
             }}
             title="{obj.label} ({obj.className}) — {m.obj_expand_from_emoji({}, { locale: $locale })}"
-            class="pointer-events-auto absolute top-0 left-0 flex flex-col items-center justify-center cursor-pointer select-none group transition-transform duration-200 {isBeingDragged
+            class="pointer-events-auto absolute top-0 left-0 flex items-center justify-center cursor-pointer select-none group {isBeingDragged
               ? 'z-30 scale-125'
-              : 'z-20 hover:scale-120 active:scale-95'}"
+              : 'z-20 hover:scale-125 active:scale-95'} transition-transform duration-150 animate-emoji-pop-in"
             style="width: 56px; height: 56px;"
           >
             <span
-              class="text-5xl select-none filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)] group-hover:drop-shadow-[0_0_16px_rgba(99,102,241,0.8)] transition-all"
+              class="text-5xl select-none filter drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)] group-hover:drop-shadow-[0_0_18px_rgba(99,102,241,0.85)] transition-all"
             >
               {emoji}
-            </span>
-            <span
-              class="text-[9px] font-mono font-bold text-slate-300 bg-slate-900/90 px-1.5 py-0.5 rounded-md border border-slate-700/80 shadow -mt-0.5 truncate max-w-[84px] pointer-events-none opacity-85 group-hover:opacity-100 transition-opacity"
-            >
-              {obj.label}
             </span>
           </div>
         {:else}
           <div
             use:bindCardEl={obj.id}
             style:transform="translate3d({pos.x}px, {pos.y}px, 0)"
-            style="min-width: 340px; width: max-content;"
             onpointerdown={(e) => e.stopPropagation()}
-            class="pointer-events-auto absolute top-0 left-0 rounded-2xl bg-slate-900/95 border-2 transition-shadow {isBeingDragged
-              ? 'z-30 border-indigo-400 shadow-2xl ring-2 ring-indigo-400/50'
-              : 'z-10 border-slate-700 hover:border-indigo-500/70 shadow-xl'}"
+            class="pointer-events-auto absolute top-0 left-0 {isBeingDragged ? 'z-30' : 'z-10'}"
           >
+            <div
+              style="min-width: 340px; width: max-content;"
+              class="rounded-2xl bg-slate-900/95 border-2 transition-shadow {isBeingDragged
+                ? 'border-indigo-400 shadow-2xl ring-2 ring-indigo-400/50'
+                : 'border-slate-700 hover:border-indigo-500/70 shadow-xl'} {isEmojiView ? 'animate-card-pop-in' : ''}"
+            >
             <!-- En-tête de l'instance -->
             <div
               onpointerdown={(e) => handleObjectPointerDown(e, obj.id)}
@@ -1772,6 +1817,7 @@
               {/if}
             </div>
           {/if}
+            </div>
           </div>
         {/if}
       {/each}
